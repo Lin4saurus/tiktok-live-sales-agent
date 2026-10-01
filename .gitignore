@@ -1,0 +1,13 @@
+# Secretos
+.env
+.env.*
+!.env.example
+secrets/
+
+# Datos internos de n8n (clave de cifrado, BD con credenciales, logs)
+n8n_data/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+node_modules/
