@@ -11,3 +11,14 @@ n8n_data/
 .DS_Store
 Thumbs.db
 node_modules/
+
+# Datos de Evolution (sesiones de WhatsApp)
+evolution_instances/
+
+# Datos de PostgreSQL
+postgres_data/
+
+
+# Archivos temporales
+*.log
+.DS_Store
