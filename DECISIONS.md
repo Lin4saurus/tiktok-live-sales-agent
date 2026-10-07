@@ -41,3 +41,5 @@ imagen recibida), antes de extraer cualquier otro dato.
 
 ### D-10 · 2026-09-25 — Entregas y envíos fuera de alcance
 La gestión de entregas y envíos queda fuera del alcance por ahora.
+
+Handoff agente↔vendedora: cada conversación tiene un estado de control ('agente' / 'humano'). Cuando un caso va a revisión, el control pasa a 'humano' y el agente se silencia para ese cliente. La vendedora resuelve manualmente por WhatsApp y, desde el panel, devuelve el control al agente (que entonces envía el QR). Esto evita que el bot interfiera en la conversación humana.
