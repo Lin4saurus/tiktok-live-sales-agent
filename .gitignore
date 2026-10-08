@@ -18,6 +18,9 @@ evolution_instances/
 # Datos de PostgreSQL
 postgres_data/
 
+# Imágenes reales de clientes para probar la visión (M3)
+pruebas_vision/
+
 
 # Archivos temporales
 *.log
