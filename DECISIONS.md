@@ -125,3 +125,10 @@ cambio de WhatsApp o del panel. La página del panel también se guarda en la ba
 Si el cliente tiene varias compras sin confirmar, un "SÍ" (o una corrección de nombre) se
 aplica a todas, y el QR (o el recordatorio, si ya lo recibió) indica el total a pagar.
 Pendiente de validar por la vendedora en una prueba real por WhatsApp.
+
+### D-25 · 2026-10-08 — El cliente puede cancelar su compra por WhatsApp
+Si el cliente dice que cancela, que ya no comprará o que no pagará, sus compras sin pagar
+(`nueva` y `confirmada`) pasan a `cancelada` y la cuenta sale de "Pendientes de pago". No se
+cancelan las compras con un comprobante enviado (reportado o en revisión) ni las pagadas: esas
+las decide la vendedora. Se le responde de forma amable, invitándolo a reenviar la captura si
+fue un error, y queda registrado en `acciones_panel` (`cancelada_por_cliente`) con su mensaje.

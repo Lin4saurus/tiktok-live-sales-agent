@@ -101,7 +101,7 @@ en **borrador** hasta que se pulsa **Publish** en n8n. La lógica de datos está
 ### Flujo de una venta
 
 1. **Captura** → Gemini lee nickname y precio manuscritos → se guarda la captura (`nueva`); la base le asigna el **live** (activo o de respaldo) y la **cuenta diaria** del cliente → se responde *"De tu captura leí el nombre X y el precio de la vendedora es Y Bs…"*, con el total si ya tenía otras pendientes.
-2. **Respuesta de texto** → Gemini clasifica: `confirma` / `corrige_nombre` / `reclama_precio` / `pide_qr` / `otro`. Se aplica a **todas** las compras `nueva` del cliente.
+2. **Respuesta de texto** → Gemini clasifica: `confirma` / `corrige_nombre` / `reclama_precio` / `pide_qr` / `cancela` / `otro`. Se aplica a **todas** las compras `nueva` del cliente. Sin compras `nueva`, palabras como "cancelo" o "ya no compraré" cancelan sus compras sin pagar (D-25) y "QR" reenvía el QR.
 3. **QR** → se envía **una vez por cuenta diaria** con *"Total a pagar: N Bs"*. Si la cuenta ya lo recibió, la confirmación recuerda el total. Si el cliente escribe "QR", se le reenvía.
 4. **Comprobante** (imagen o PDF) → Gemini extrae los datos → `WA - Pagos`: igual → `reportado`; menor → `parcial` ("te faltarían N Bs"); mayor o con banderas → `requiere_revision` y la conversación pasa a la vendedora.
 5. **Vendedora** → en el panel confirma el pago con el monto que vio en su banco (total o parcial), o arrastra la cuenta a "Pagadas". El cliente recibe el aviso.

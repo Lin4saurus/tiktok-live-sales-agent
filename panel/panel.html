@@ -274,6 +274,7 @@ const ACCIONES = {
   marcar_pagada: 'Marcada como pagada', cambiar_estado: 'Cambio de estado', editar: 'Edición',
   confirmar_pago: 'Pago confirmado', devolver_agente: 'Devuelta al agente', tomar_conversacion: 'Conversación tomada',
   reenviar_qr: 'QR reenviado', cliente_editar: 'Datos del cliente', vencimiento: 'Vencida por falta de pago',
+  cancelada_por_cliente: 'Cancelada por el cliente',
 };
 
 const $ = (id) => document.getElementById(id);
@@ -705,6 +706,7 @@ function pintarCuenta(d) {
       <li><strong>${esc(ACCIONES[a.accion] || a.accion)}</strong> · <span class="hint">${fecha(a.fecha)}</span>
         ${a.estado_anterior || a.estado_nuevo ? `<br>${esc(ESTADOS[a.estado_anterior] || a.estado_anterior || '—')} → ${esc(ESTADOS[a.estado_nuevo] || a.estado_nuevo || '—')}` : ''}
         ${a.detalle?.monto_confirmado ? `<br>Monto: ${bs(a.detalle.monto_confirmado)}` : ''}
+        ${a.accion === 'cancelada_por_cliente' && a.detalle?.mensaje_cliente ? `<br><span class="hint">Mensaje: «${esc(a.detalle.mensaje_cliente)}»</span>` : ''}
         ${a.detalle?.nota ? `<br><span class="hint">Nota: ${esc(a.detalle.nota)}</span>` : ''}</li>`).join('')}</ul></div>`;
   }
 

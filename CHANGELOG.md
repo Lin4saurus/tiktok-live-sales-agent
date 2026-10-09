@@ -2,6 +2,7 @@
 
 Una línea por sesión de trabajo, la más reciente arriba. Formato: `AAAA-MM-DD — [Milestone] descripción`.
 
+- 2026-10-08 — [M5] El cliente puede cancelar su compra por WhatsApp (intención 'cancela', D-25); borrador del adaptador de entrada. Compra de prueba "Koorica" cancelada a mano.
 - 2026-10-07 — [M12] Secretos de docker-compose.yml a .env; zona America/La_Paz; Postgres y Evolution solo en 127.0.0.1 (requiere reinicio).
 - 2026-10-07 — [M3] Herramienta herramientas/probar_vision.ps1 para medir la visión con imágenes reales.
 - 2026-10-07 — [M10/M11] Panel v2: tablero por cuentas con arrastrar y soltar, live, detalle con conversación, reporte y CSV; página servida desde la base (panel/panel.html).
