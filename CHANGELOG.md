@@ -2,6 +2,12 @@
 
 Una línea por sesión de trabajo, la más reciente arriba. Formato: `AAAA-MM-DD — [Milestone] descripción`.
 
+- 2026-10-12 — [M2] WhatsApp Cloud API oficial (borrador): db/007 configuracion_whatsapp, webhook /webhook/whatsapp-cloud con verificación y descarga de archivos, envío por Graph API con plantilla fuera de 24 h, credencial whatsapp-cloud-token (D-30).
+- 2026-10-12 — [M10] "Devolver al agente" → "Reactivar bot", "Atender yo" → "Pausar bot (atiendo yo)"; comprobante repetido → "⚠ Posible estafa" con el pago anterior que usó esa referencia (D-29).
+- 2026-10-12 — [M10] El panel sigue solo al live actual (un live de respaldo nuevo dejaba el tablero en el live anterior), avisa de cuentas abiertas en otros lives, descarta respuestas de un live anterior y en segundo plano consulta cada 4 s con aviso en el título (D-28).
+- 2026-10-12 — [M7] WA - Pagos ya no responde al recibir un comprobante; el único mensaje es la confirmación de la vendedora (D-27). Borrador, falta publicar.
+- 2026-10-11 — [M10] Panel en tiempo real (db/006, sondeo de 3 s con animaciones), un solo "Confirmar pago" en Acciones (confirmar_pago_cuenta), detalle reordenado y conversación ampliable (D-26).
+- 2026-10-11 — [M12] aplicar_migraciones.ps1 corrompía tildes al pasar el SQL por PowerShell; ahora copia el archivo al contenedor. Funciones reaplicadas y título del live de respaldo corregido.
 - 2026-10-08 — [M5] El cliente puede cancelar su compra por WhatsApp (intención 'cancela', D-25); borrador del adaptador de entrada. Compra de prueba "Koorica" cancelada a mano.
 - 2026-10-07 — [M12] Secretos de docker-compose.yml a .env; zona America/La_Paz; Postgres y Evolution solo en 127.0.0.1 (requiere reinicio).
 - 2026-10-07 — [M3] Herramienta herramientas/probar_vision.ps1 para medir la visión con imágenes reales.

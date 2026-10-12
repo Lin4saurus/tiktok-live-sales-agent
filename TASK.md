@@ -92,3 +92,4 @@
 4. Reiniciar Docker (`docker compose up -d`) para aplicar zona horaria y `.env`.
 5. Cambiar la contraseña de Postgres y la API key de Evolution (y actualizar las credenciales de n8n).
 6. Poner 20 imágenes reales en `pruebas_vision/` y ejecutar `herramientas\probar_vision.ps1`.
+7. WhatsApp Cloud API (D-30): crear la app de Meta, pegar el token en la credencial `whatsapp-cloud-token`, cargar `phone_number_id`/`waba_id`, abrir un túnel HTTPS, configurar el webhook, crear la plantilla `aviso_compra`, agregar método de pago y verificar el negocio. Luego cambiar `proveedor` a `cloud`.

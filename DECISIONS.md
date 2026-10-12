@@ -132,3 +132,48 @@ Si el cliente dice que cancela, que ya no comprará o que no pagará, sus compra
 cancelan las compras con un comprobante enviado (reportado o en revisión) ni las pagadas: esas
 las decide la vendedora. Se le responde de forma amable, invitándolo a reenviar la captura si
 fue un error, y queda registrado en `acciones_panel` (`cancelada_por_cliente`) con su mensaje.
+
+### D-26 · 2026-10-11 — Panel en tiempo real y un solo "Confirmar pago"
+El panel se actualiza solo, sin recargar: consulta cada 3 s un contador de cambios de la base
+(secuencia `panel_cambios`, que avanzan los triggers de `db/006`) y solo recarga los datos
+cuando cambió; las cuentas aparecen, cambian de columna o desaparecen con una animación. El
+refresco espera mientras la vendedora arrastra una tarjeta, confirma algo o escribe. Las
+ejecuciones exitosas del workflow `Panel - API` no se guardan en n8n (serían miles por día).
+Confirmar un pago tiene un único camino, el botón "Confirmar pago" de Acciones (o arrastrar a
+"Pagadas"): pide el monto visto en el banco, usa el comprobante pendiente de la cuenta si lo hay
+o registra un pago de la vendedora si no lo hay; si cubre el saldo la cuenta queda pagada y si
+es menor, parcial. El detalle de una cuenta se ordena para actuar: Acciones, Comprobantes,
+Conversación (ampliable), Cuenta con sus compras, Cliente e Historial.
+
+### D-27 · 2026-10-12 — Un solo mensaje sobre el pago: la confirmación de la vendedora
+Al recibir un comprobante (imagen o PDF) el sistema lo registra y concilia en silencio: ya no
+se envía "Recibí tu comprobante…" en ningún caso (coincide, parcial o en revisión). El único
+mensaje que recibe el cliente sobre su pago es el que se envía cuando la vendedora lo confirma
+en el panel ("La vendedora verificó tu pago de X Bs…", o cuánto le falta si fue parcial).
+Reemplaza la respuesta automática descrita en D-16 y D-20.
+
+### D-28 · 2026-10-12 — El panel sigue solo al live actual
+El tablero muestra siempre el live actual (el activo o, si no hay, el más reciente, incluido un
+live de respaldo creado al llegar una captura) y cambia a él solo cuando aparece uno nuevo,
+avisando a la vendedora. Si ella elige a mano un live anterior, se queda ahí con el aviso "Hay
+un live más reciente". La barra del live avisa también de cuentas por revisar o con saldo en
+otros lives. Con la pestaña en segundo plano el panel sigue consultando cada 4 s y el título
+muestra cuántas novedades hubo ("(3) Panel de ventas"). Complementa a D-26.
+
+### D-29 · 2026-10-12 — Textos del panel: "Pausar bot / Reactivar bot" y "Posible estafa"
+En el panel, el control agente/humano se nombra por lo que hace: "Pausar bot (atiendo yo)" y
+"Reactivar bot" (antes "Atender yo" / "Devolver al agente"), con la etiqueta "Bot en pausa".
+Un comprobante cuya referencia ya se usó en otro pago se marca como "⚠ Posible estafa:
+comprobante repetido" y el detalle explica a qué pago anterior pertenece (cliente, monto,
+fecha), si lo envió el mismo cliente u otro, y que no se confirme hasta ver el dinero en el
+banco. Son textos solo para la vendedora: al cliente nunca se le acusa (D-15).
+
+### D-30 · 2026-10-12 — WhatsApp Cloud API oficial junto a Evolution, con un interruptor
+Para producción se usa la API oficial de Meta (Evolution no es oficial y el número puede ser
+bloqueado). Los dos proveedores conviven y se elige en `configuracion_whatsapp.proveedor`
+(`evolution` | `cloud`), sin tocar los workflows. Entrada: el webhook `/webhook/whatsapp-cloud`
+traduce los mensajes de Meta al formato de Evolution y los entrega a "Normalizar mensaje", así el
+resto del flujo es el mismo. Salida: según el proveedor, envía por Evolution o por la Graph API
+(las imágenes se suben como media); si Meta rechaza un mensaje por estar fuera de la ventana de
+24 h (error 131047), se reintenta con la plantilla utility `aviso_compra`. El token de Meta vive
+solo en la credencial de n8n `whatsapp-cloud-token`.

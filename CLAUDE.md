@@ -41,7 +41,7 @@ está cerrado (ver `DECISIONS.md`).
 | Orquestación | **n8n** (self-hosted en Docker, ver `docker-compose.yml`) — http://127.0.0.1:5678 | Flujos visuales fáciles de mostrar y mantener; nodos nativos para HTTP, webhooks, BD y LLMs; nodos Code en JavaScript para la lógica propia. |
 | Lógica | **JavaScript** (nodos Code de n8n) + **SQL** (nodos Postgres) | Lenguaje nativo de n8n. Las reglas que tocan varias filas van en una sola sentencia o función SQL para que sean atómicas. |
 | Reglas de datos | **Funciones y triggers de PostgreSQL** (`db/002`–`005`) | Lo que debe cumplirse siempre (live y cuenta de cada captura, totales, control agente/humano, conciliación) vive en la base, venga el cambio de WhatsApp o del panel. |
-| Mensajería | **Evolution API v2.3.4** (instancia `ventas_tiktok`) — elegida para la fase actual | Rápida de montar para pruebas. WhatsApp Cloud API queda como opción para producción (sin decidir). |
+| Mensajería | **Evolution API v2.3.4** (pruebas) y **WhatsApp Cloud API** oficial de Meta (producción), con un interruptor en `configuracion_whatsapp.proveedor` (D-30) | Evolution es rápido de montar pero no oficial (riesgo de bloqueo); la Cloud API es la oficial y cobra por mensaje según Meta. |
 | Visión / texto | **Google Gemini** (`gemini-3.1-flash-lite`) con el nodo nativo de n8n | Lee capturas del live y comprobantes (imagen y PDF) y clasifica la intención de las respuestas de texto; devuelve JSON. |
 | Base de datos | **PostgreSQL 16**, base `ventas` (extensiones `unaccent` y `fuzzystrmatch`) | El dominio es relacional y requiere integridad y consultas por fecha/estado. Ver `DATA_MODEL.md`. |
 | Panel de control | **Página web servida por n8n** (`panel/panel.html`, guardada en la base) + API de webhooks en el workflow `Panel - API` | Sin servidor extra: la vendedora abre http://127.0.0.1:5678/webhook/panel. |
@@ -59,7 +59,8 @@ está cerrado (ver `DECISIONS.md`).
 - **revisión** — Estado `requiere_revision`: algo no cuadra o no se entendió. Nunca es un rechazo; la vendedora decide desde el panel.
 - **pago reportado** — El cliente envió un comprobante que cuadra; falta que la vendedora lo vea en su banco. **No** es "pagado".
 - **pago parcial** — El cliente pagó menos de lo que debe; la cuenta queda `parcial` con su saldo.
-- **control humano** — La vendedora atiende la conversación de un cliente y el bot no le responde (handoff). Se activa cuando algo pasa a revisión o desde el panel; se devuelve al agente desde el panel.
+- **control humano / bot en pausa** — La vendedora atiende la conversación de un cliente y el bot no le responde (handoff). Se activa cuando algo pasa a revisión o con "Pausar bot (atiendo yo)"; se termina con "Reactivar bot". En el código y la base sigue llamándose `control = 'humano'` / `devolver_agente`.
+- **posible estafa** — Comprobante cuyo número de operación ya se usó en otro pago (bandera `referencia_duplicada`). Solo lo ve la vendedora.
 
 ## 4. Convenciones de IDs
 
@@ -93,8 +94,8 @@ en **borrador** hasta que se pulsa **Publish** en n8n. La lógica de datos está
 | Workflow | ID | Qué hace |
 |---|---|---|
 | **WA - Adaptador de entrada (Evolution)** | `65m8fkrTuzGtYPTk` | Webhook `POST /webhook/evolution-inbound` (Evolution apunta a `http://n8n:5678/...`). Normaliza el mensaje, descarta grupos (`@g.us`), mensajes propios (`fromMe`) y eventos que no son `messages.upsert`; registra el mensaje (idempotencia + historial) y, si la vendedora atiende a ese cliente (`control = humano`), se detiene. Enruta: **imagen** → Gemini clasifica `captura_live` / `comprobante_pago`; **texto** → interpreta la respuesta; **PDF** → comprobante. |
-| **WA - Adaptador de salida (Evolution)** | `IHvSy5Dn3qEbQHQQ` | Sub-workflow reutilizable: envía por Evolution texto (`sendText`) o imagen con pie (`sendMedia`) y guarda el mensaje enviado en `mensajes`. |
-| **WA - Pagos** | `FKzlPXY3RHPBAZ26` | Sub-workflow: `fn_registrar_pago` concilia el comprobante (coincide / parcial / revisión) y se responde con un mensaje neutro. |
+| **WA - Adaptador de salida (Evolution)** | `IHvSy5Dn3qEbQHQQ` | Sub-workflow reutilizable: según `configuracion_whatsapp.proveedor` envía por Evolution (`sendText` / `sendMedia`) o por la Cloud API de Meta (texto; imagen subida como media; plantilla `aviso_compra` si pasaron más de 24 h) y guarda el mensaje enviado en `mensajes`. |
+| **WA - Pagos** | `FKzlPXY3RHPBAZ26` | Sub-workflow: `fn_registrar_pago` concilia el comprobante (coincide / parcial / revisión). No responde al cliente (D-27). |
 | **Panel - API** | `4LsIRtnSwlEumgHt` | Backend y página del panel (ver §8). |
 | **Vencimientos** | `TbrboRHbDH2uJBMf` | Cada hora (minuto 5): `fn_vencer_cuentas` cancela cuentas vencidas sin pago y avisa al cliente y a la vendedora. |
 
@@ -103,7 +104,7 @@ en **borrador** hasta que se pulsa **Publish** en n8n. La lógica de datos está
 1. **Captura** → Gemini lee nickname y precio manuscritos → se guarda la captura (`nueva`); la base le asigna el **live** (activo o de respaldo) y la **cuenta diaria** del cliente → se responde *"De tu captura leí el nombre X y el precio de la vendedora es Y Bs…"*, con el total si ya tenía otras pendientes.
 2. **Respuesta de texto** → Gemini clasifica: `confirma` / `corrige_nombre` / `reclama_precio` / `pide_qr` / `cancela` / `otro`. Se aplica a **todas** las compras `nueva` del cliente. Sin compras `nueva`, palabras como "cancelo" o "ya no compraré" cancelan sus compras sin pagar (D-25) y "QR" reenvía el QR.
 3. **QR** → se envía **una vez por cuenta diaria** con *"Total a pagar: N Bs"*. Si la cuenta ya lo recibió, la confirmación recuerda el total. Si el cliente escribe "QR", se le reenvía.
-4. **Comprobante** (imagen o PDF) → Gemini extrae los datos → `WA - Pagos`: igual → `reportado`; menor → `parcial` ("te faltarían N Bs"); mayor o con banderas → `requiere_revision` y la conversación pasa a la vendedora.
+4. **Comprobante** (imagen o PDF) → Gemini extrae los datos → `WA - Pagos`: igual → `reportado`; menor → `parcial`; mayor o con banderas → `requiere_revision` y la conversación pasa a la vendedora. **No se responde nada al cliente** (D-27): la cuenta aparece en "Por revisar" del panel.
 5. **Vendedora** → en el panel confirma el pago con el monto que vio en su banco (total o parcial), o arrastra la cuenta a "Pagadas". El cliente recibe el aviso.
 6. **Vencimiento** → al terminar el día siguiente al live, las cuentas sin nada pagado se cancelan y se avisa.
 
@@ -136,16 +137,17 @@ en **borrador** hasta que se pulsa **Publish** en n8n. La lógica de datos está
 ## 8. Panel de control
 
 - **Interfaz:** http://127.0.0.1:5678/webhook/panel (solo desde esta PC). Fuente: `panel/panel.html`; tras modificarla, ejecutar `db\cargar_panel.ps1`.
-  - Barra del live: selector, iniciar/cerrar live e indicadores (vendido, cobrado, por cobrar, clientes, compras, por revisar).
+  - **Tiempo real** (D-26): cada 3 s consulta `q=version` (secuencia `panel_cambios`, db/006) y recarga solo si hubo cambios; las tarjetas entran, se mueven y salen con animación. No hay botón "Actualizar".
+  - Barra del live: selector, iniciar/cerrar live e indicadores (vendido, cobrado, por cobrar, clientes, compras, por revisar). El panel **sigue solo al live actual** y avisa de cuentas abiertas en otros lives (D-28); en segundo plano consulta cada 4 s y marca las novedades en el título de la pestaña.
   - **Tablero**: columnas Pendientes de pago / Por revisar / Pagadas (y canceladas o vencidas aparte). Las cuentas se arrastran entre columnas con confirmación.
-  - **Detalle de cuenta**: cliente (nombre real, nicknames, control), comprobantes con "Confirmar pago…" (monto editable), compras con su captura, conversación de WhatsApp e historial.
+  - **Detalle de cuenta**, en este orden: Acciones (único "Confirmar pago…" con monto editable, "Pausar bot (atiendo yo)" / "Reactivar bot", reenviar QR), Comprobantes, Conversación de WhatsApp (botón "Ampliar"), Cuenta con sus compras, Cliente, Historial.
   - **Compras**: lista y edición por compra. **Reporte**: resumen del live y descarga CSV.
 - **API** (todas con header `X-Panel-Key`, credencial `panel-api-key`):
 
 | Método y ruta (`/webhook/...`) | Uso |
 |---|---|
-| `GET panel/consulta?q=` `lives` · `cuentas&live_id=` · `cuenta&id=` · `captura_imagen&id=` · `reporte&live_id=` | Datos del tablero y detalle (`fn_panel_consulta`). |
-| `POST panel/accion` `{accion, ...}` | `iniciar_live`, `cerrar_live`, `confirmar_pago {pago_id, monto}`, `cuenta_pagada {cuenta_id}`, `cuenta_revision {cuenta_id}`, `devolver_agente {cuenta_id o whatsapp, enviar_qr}`, `reenviar_qr`, `cliente_editar {whatsapp, nombre_real}` (`fn_panel_accion`). |
+| `GET panel/consulta?q=` `version` · `lives` · `cuentas&live_id=` · `cuenta&id=` · `captura_imagen&id=` · `reporte&live_id=` | Datos del tablero y detalle (`fn_panel_consulta`). |
+| `POST panel/accion` `{accion, ...}` | `iniciar_live`, `cerrar_live`, `confirmar_pago_cuenta {cuenta_id, monto}` (el que usa el panel), `confirmar_pago {pago_id, monto}`, `cuenta_pagada {cuenta_id}`, `cuenta_revision {cuenta_id}`, `devolver_agente {cuenta_id o whatsapp, enviar_qr}`, `reenviar_qr`, `cliente_editar {whatsapp, nombre_real}` (`fn_panel_accion`). |
 | `GET panel/resumen` · `panel/compras` · `panel/compra?id=` · `panel/comprobante?pago_id=` | Lecturas por compra. |
 | `POST panel/compra/marcar-pagada` · `cambiar-estado` · `editar` | Acciones por compra. |
 

@@ -27,6 +27,17 @@ CREATE OR REPLACE FUNCTION fn_columna_cuenta(p_cuenta text) RETURNS text LANGUAG
   WHERE cd.cuenta_id = p_cuenta
 $$;
 
+-- Comprobante más reciente de la cuenta que espera verificación (o NULL).
+CREATE OR REPLACE FUNCTION fn_pago_pendiente_cuenta(p_cuenta text) RETURNS json LANGUAGE sql STABLE AS $$
+  SELECT json_build_object('pago_id', p.pago_id, 'monto_pagado', p.monto_pagado,
+                           'fecha_recepcion', p.fecha_recepcion, 'estado_pago', p.estado_pago)
+  FROM pagos p
+  WHERE p.estado_pago IN ('reportado', 'requiere_revision')
+    AND EXISTS (SELECT 1 FROM pagos_capturas pc JOIN capturas c ON c.captura_id = pc.captura_id
+                WHERE pc.pago_id = p.pago_id AND c.cuenta_id = p_cuenta)
+  ORDER BY p.fecha_recepcion DESC LIMIT 1
+$$;
+
 CREATE OR REPLACE FUNCTION fn_indicadores_live(p_live text) RETURNS json LANGUAGE sql STABLE AS $$
   SELECT json_build_object(
     'live_id', l.live_id, 'titulo', l.titulo, 'fecha_operativa', l.fecha_operativa, 'estado', l.estado,
@@ -52,6 +63,12 @@ DECLARE
   v_live text;
   v_id   text := NULLIF(p ->> 'id', '');
 BEGIN
+  -- Contador de cambios (db/006): el panel lo consulta cada pocos segundos y solo recarga si cambió.
+  IF p_q = 'version' THEN
+    RETURN QUERY SELECT 200, json_build_object('ok', true, 'version', (SELECT last_value FROM panel_cambios));
+    RETURN;
+  END IF;
+
   IF p_q = 'lives' THEN
     RETURN QUERY SELECT 200, json_build_object('ok', true,
       'activo', (SELECT live_id FROM lives WHERE estado = 'activo'),
@@ -89,6 +106,7 @@ BEGIN
           'pago_por_verificar', EXISTS (SELECT 1 FROM pagos_capturas pc JOIN capturas c ON c.captura_id = pc.captura_id
                       JOIN pagos p2 ON p2.pago_id = pc.pago_id
                       WHERE c.cuenta_id = cd.cuenta_id AND p2.estado_pago IN ('reportado', 'requiere_revision')),
+          'pago_pendiente', fn_pago_pendiente_cuenta(cd.cuenta_id),
           'ultima_actividad', (SELECT max(c.fecha_recepcion) FROM capturas c WHERE c.cuenta_id = cd.cuenta_id))
           ORDER BY cd.fecha_creacion)
         FROM cuentas_diarias cd JOIN clientes cl ON cl.cliente_id = cd.cliente_id
@@ -107,7 +125,7 @@ BEGIN
                   'fecha_limite_pago', cd.fecha_limite_pago, 'subtotal', cd.subtotal,
                   'monto_confirmado', cd.monto_confirmado, 'saldo', cd.saldo, 'estado', cd.estado,
                   'columna', fn_columna_cuenta(cd.cuenta_id), 'qr_enviado_en', cd.qr_enviado_en,
-                  'vencida_en', cd.vencida_en),
+                  'vencida_en', cd.vencida_en, 'pago_pendiente', fn_pago_pendiente_cuenta(cd.cuenta_id)),
       'cliente', json_build_object('whatsapp', cl.whatsapp, 'push_name', cl.push_name, 'nombre_real', cl.nombre_real,
                   'provisional', cl.nombre_real IS NULL, 'control', cl.control, 'control_desde', cl.control_desde,
                   'nicknames', (SELECT COALESCE(json_agg(json_build_object('nickname', nickname, 'capturas', capturas)
@@ -128,13 +146,23 @@ BEGIN
                     'receptor_comprobante', p2.receptor_comprobante, 'fecha_comprobante', p2.fecha_comprobante,
                     'banco_app', p2.banco_app, 'confianza', p2.confianza, 'motivo_revision', p2.motivo_revision,
                     'fecha_recepcion', p2.fecha_recepcion, 'fecha_verificacion', p2.fecha_verificacion,
-                    'tiene_comprobante', p2.comprobante_base64 IS NOT NULL) ORDER BY p2.fecha_recepcion DESC)
+                    'tiene_comprobante', p2.comprobante_base64 IS NOT NULL,
+                    -- Pago anterior con la misma referencia (para el aviso de comprobante repetido)
+                    'referencia_repetida', (SELECT json_build_object('pago_id', o.pago_id, 'whatsapp', o.whatsapp,
+                                              'cliente', COALESCE(oc.nombre_real, oc.push_name), 'monto_pagado', o.monto_pagado,
+                                              'fecha_recepcion', o.fecha_recepcion, 'estado_pago', o.estado_pago,
+                                              'mismo_cliente', o.whatsapp = p2.whatsapp)
+                                            FROM pagos o LEFT JOIN clientes oc ON oc.whatsapp = o.whatsapp
+                                            WHERE p2.referencia_normalizada IS NOT NULL
+                                              AND o.referencia_normalizada = p2.referencia_normalizada
+                                              AND o.pago_id <> p2.pago_id
+                                            ORDER BY o.fecha_recepcion LIMIT 1)) ORDER BY p2.fecha_recepcion DESC)
                   FROM pagos p2 WHERE p2.pago_id IN (
                     SELECT pc.pago_id FROM pagos_capturas pc JOIN capturas c ON c.captura_id = pc.captura_id
                     WHERE c.cuenta_id = cd.cuenta_id)), '[]'::json),
       'mensajes', COALESCE((SELECT json_agg(m ORDER BY m.fecha) FROM (
                     SELECT direccion, tipo, texto, fecha FROM mensajes
-                    WHERE whatsapp = cl.whatsapp ORDER BY fecha DESC LIMIT 40) m), '[]'::json),
+                    WHERE whatsapp = cl.whatsapp ORDER BY fecha DESC LIMIT 150) m), '[]'::json),
       'historial', COALESCE((SELECT json_agg(json_build_object('fecha', a.fecha, 'accion', a.accion,
                     'captura_id', a.captura_id, 'estado_anterior', a.estado_anterior, 'estado_nuevo', a.estado_nuevo,
                     'detalle', a.detalle) ORDER BY a.fecha DESC, a.accion_id DESC)
@@ -178,6 +206,7 @@ DECLARE
   v_total     numeric;
   v_ids       text[];
   v_aviso     json;
+  v_pago      text;
 BEGIN
   -- Las acciones sobre una cuenta la identifican por cuenta_id; las de cliente aceptan whatsapp.
   IF b ? 'cuenta_id' THEN
@@ -218,6 +247,34 @@ BEGIN
   -- M8 · Confirmar un pago (total o parcial) con el monto que la vendedora vio en su banco
   IF v_accion = 'confirmar_pago' THEN
     RETURN QUERY SELECT * FROM fn_confirmar_pago(b ->> 'pago_id', NULLIF(b ->> 'monto', '')::numeric, v_nota, v_notificar);
+    RETURN;
+  END IF;
+
+  -- M8/M10 · Confirmar pago de una cuenta (botón "Confirmar pago" y arrastrar a "Pagadas").
+  -- La vendedora escribe el monto que vio en su banco. Se usa el comprobante pendiente más
+  -- reciente de la cuenta; si no hay, se registra un pago hecho por la vendedora. Todas las
+  -- compras abiertas de la cuenta quedan cubiertas por ese pago, y fn_confirmar_pago reparte el
+  -- monto: si cubre el saldo la cuenta queda pagada; si es menor, queda parcial.
+  IF v_accion = 'confirmar_pago_cuenta' THEN
+    IF v_cuenta.cuenta_id IS NULL THEN
+      RETURN QUERY SELECT 400, json_build_object('ok', false, 'error', 'cuenta_id_requerido'), '[]'::json; RETURN;
+    END IF;
+    v_total := CASE WHEN replace(COALESCE(b ->> 'monto', ''), ',', '.') ~ '^[0-9]+([.][0-9]{1,2})?$'
+                    THEN replace(b ->> 'monto', ',', '.')::numeric END;
+    IF v_total IS NULL OR v_total <= 0 THEN
+      RETURN QUERY SELECT 400, json_build_object('ok', false, 'error', 'monto_requerido'), '[]'::json; RETURN;
+    END IF;
+    v_pago := (fn_pago_pendiente_cuenta(v_cuenta.cuenta_id) ->> 'pago_id');
+    IF v_pago IS NULL THEN
+      INSERT INTO pagos (whatsapp, monto_pagado, monto_esperado, resultado, estado_pago, notas)
+      VALUES (v_whatsapp, v_total, v_cuenta.saldo, 'manual', 'reportado', 'Registrado por la vendedora desde el panel')
+      RETURNING pago_id INTO v_pago;
+    END IF;
+    INSERT INTO pagos_capturas (pago_id, captura_id)
+    SELECT v_pago, captura_id FROM capturas
+    WHERE cuenta_id = v_cuenta.cuenta_id AND estado_captura NOT IN ('pagada', 'cancelada')
+    ON CONFLICT DO NOTHING;
+    RETURN QUERY SELECT * FROM fn_confirmar_pago(v_pago, v_total, v_nota, v_notificar);
     RETURN;
   END IF;
 
@@ -313,7 +370,7 @@ BEGIN
   END IF;
 
   RETURN QUERY SELECT 400, json_build_object('ok', false, 'error', 'accion_desconocida',
-    'acciones', json_build_array('iniciar_live', 'cerrar_live', 'confirmar_pago', 'cuenta_pagada',
+    'acciones', json_build_array('iniciar_live', 'cerrar_live', 'confirmar_pago', 'confirmar_pago_cuenta', 'cuenta_pagada',
                                  'cuenta_revision', 'devolver_agente', 'reenviar_qr', 'cliente_editar')), '[]'::json;
 END $$;
 

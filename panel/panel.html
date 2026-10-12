@@ -150,6 +150,47 @@ dialog.modal .acciones-modal { display: flex; gap: 8px; justify-content: flex-en
 dialog.modal label { display: block; margin-top: 10px; font-size: 14px; }
 dialog.modal input[type=text], dialog.modal input[inputmode] { width: 100%; margin-top: 4px; }
 
+/* Tiempo real */
+.en-vivo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--pag-fg); font-weight: 600; }
+.en-vivo i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: latido 2s infinite; }
+.en-vivo.caido { color: var(--danger); }
+.en-vivo.caido i { animation: none; }
+@keyframes latido { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+.cardc.llega { animation: llega .45s ease-out, resalta 2.6s ease-out; }
+.cardc.sale { animation: sale .28s ease-in forwards; }
+.cuenta-col.cambia { animation: resalta-num 1.6s ease-out; border-radius: 999px; padding: 0 6px; }
+@keyframes llega { from { opacity: 0; transform: translateY(-10px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes sale { to { opacity: 0; transform: scale(.95); } }
+@keyframes resalta { 0%, 35% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: var(--shadow); } }
+@keyframes resalta-num { 0%, 40% { background: var(--accent); color: var(--accent-text); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .cardc.llega, .cardc.sale, .cuenta-col.cambia, .en-vivo i { animation: none; }
+}
+
+/* Posible estafa */
+.badge.alerta { background: var(--danger); color: #fff; }
+.alerta-estafa { border: 2px solid var(--danger); background: var(--rev-bg); color: var(--text); border-radius: 10px; padding: 12px 14px; font-size: 14px; display: grid; gap: 6px; }
+.alerta-estafa strong { color: var(--danger); font-size: 15px; }
+.alerta-estafa p { margin: 0; }
+
+/* Aviso de otros lives */
+.otros-lives { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 13px; }
+.otros-lives .aviso-live { display: inline-flex; gap: 6px; align-items: center; background: var(--rep-bg); color: var(--rep-fg); border-radius: 999px; padding: 3px 4px 3px 10px; }
+.otros-lives .aviso-live.rev { background: var(--rev-bg); color: var(--rev-fg); }
+.otros-lives button { border: none; background: var(--card); color: var(--text); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+
+/* Detalle: acciones primero */
+.sec-acciones { border: 2px solid var(--accent); }
+.resumen-acc { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; font-size: 14px; }
+.h3-fila { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+/* Conversación ampliada */
+dialog#dlg-chat { width: min(760px, calc(100vw - 32px)); height: min(86vh, 900px); padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); }
+dialog#dlg-chat[open] { display: flex; flex-direction: column; }
+dialog#dlg-chat::backdrop { background: rgba(0,0,0,.45); }
+dialog#dlg-chat .det-head { border-radius: 16px 16px 0 0; }
+dialog#dlg-chat .chat { flex: 1; max-height: none; padding: 16px; }
+
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 50; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; max-width: calc(100vw - 32px); box-shadow: 0 6px 24px rgba(0,0,0,.25); font-size: 14px; }
 .toast.err { background: var(--danger); color: #fff; }
 
@@ -181,8 +222,8 @@ dialog.modal input[type=text], dialog.modal input[inputmode] { width: 100%; marg
 <section id="vista-app" class="wrap" hidden>
   <header class="top">
     <h1>Panel de ventas</h1>
+    <span class="en-vivo" id="en-vivo" title="El panel se actualiza solo"><i></i> En vivo</span>
     <span class="sub" id="actualizado"></span>
-    <button class="btn" id="btn-recargar" type="button">Actualizar</button>
     <button class="btn" id="btn-salir" type="button">Salir</button>
   </header>
 
@@ -193,6 +234,7 @@ dialog.modal input[type=text], dialog.modal input[inputmode] { width: 100%; marg
       <button class="btn primary" type="button" id="btn-live"></button>
     </div>
     <div class="kpis" id="kpis"></div>
+    <div class="otros-lives" id="otros-lives" hidden></div>
   </section>
 
   <nav class="tabs" role="tablist">
@@ -204,7 +246,7 @@ dialog.modal input[type=text], dialog.modal input[inputmode] { width: 100%; marg
   <section id="tab-tablero">
     <div class="tablero" id="tablero"></div>
     <details class="cerradas" id="cerradas"><summary></summary><div class="cards lista" style="margin-top:8px"></div></details>
-    <p class="hint">Arrastra una cuenta entre columnas para cambiarla (se pide confirmación). En el celular, tócala y usa los botones del detalle.</p>
+    <p class="hint">El tablero se actualiza solo. Arrastra una cuenta entre columnas para cambiarla (se pide confirmación); en el celular, tócala y usa los botones del detalle.</p>
   </section>
 
   <section id="tab-compras" hidden>
@@ -230,6 +272,11 @@ dialog.modal input[type=text], dialog.modal input[inputmode] { width: 100%; marg
 <dialog class="lateral" id="dlg-compra" aria-labelledby="compra-titulo">
   <div class="det-head"><h2 id="compra-titulo">Compra</h2><button class="btn" type="button" data-cerrar>Cerrar</button></div>
   <div class="det-body" id="compra-body"></div>
+</dialog>
+
+<dialog id="dlg-chat" aria-labelledby="chat-titulo">
+  <div class="det-head"><h2 id="chat-titulo">Conversación</h2><button class="btn" type="button" data-cerrar>Cerrar</button></div>
+  <div class="chat" id="chat-grande"></div>
 </dialog>
 
 <dialog class="modal" id="dlg-confirmar">
@@ -263,7 +310,7 @@ const COLUMNAS = [
 const ORDEN_FILTROS = ['', 'requiere_revision', 'pago_reportado', 'confirmada', 'nueva', 'pagada', 'cancelada'];
 // Motivos de revisión en lenguaje neutro: describen el dato, nunca acusan al cliente.
 const MOTIVOS = {
-  referencia_duplicada: 'La referencia del comprobante ya aparece en otro pago',
+  referencia_duplicada: 'Comprobante repetido (su número de operación ya se usó en otro pago)',
   monto_mayor: 'El monto es mayor a lo que debe',
   monto_no_coincide: 'El monto no coincide con lo que debe',
   receptor_distinto: 'El destinatario no parece ser la titular del QR',
@@ -272,7 +319,7 @@ const MOTIVOS = {
 };
 const ACCIONES = {
   marcar_pagada: 'Marcada como pagada', cambiar_estado: 'Cambio de estado', editar: 'Edición',
-  confirmar_pago: 'Pago confirmado', devolver_agente: 'Devuelta al agente', tomar_conversacion: 'Conversación tomada',
+  confirmar_pago: 'Pago confirmado', devolver_agente: 'Bot reactivado', tomar_conversacion: 'Bot en pausa (la atendiste tú)',
   reenviar_qr: 'QR reenviado', cliente_editar: 'Datos del cliente', vencimiento: 'Vencida por falta de pago',
   cancelada_por_cliente: 'Cancelada por el cliente',
 };
@@ -394,6 +441,7 @@ function confirmar({ titulo, texto, campos = '', boton = 'Confirmar' }) {
       });
       if (dlg.open) dlg.close();
       resolve(ok ? datos : null);
+      setTimeout(refrescoPendiente, 0);
     };
     const alEnviar = (ev) => { ev.preventDefault(); terminar(ev.submitter?.value === 'ok'); };
     const alCancelar = (ev) => { ev.preventDefault(); terminar(false); };
@@ -450,20 +498,35 @@ $('btn-salir').addEventListener('click', () => cerrarSesion());
 document.querySelectorAll('[data-cerrar]').forEach((b) => b.addEventListener('click', () => {
   const dlg = b.closest('dialog');
   dlg.close();
-  if (dlg.id === 'dlg-cuenta') estado.cuentaAbierta = null;
+  if (dlg.id === 'dlg-cuenta') { estado.cuentaAbierta = null; firmaCuenta = ''; }
   if (dlg.id === 'dlg-compra') estado.compraAbierta = null;
 }));
 
 // --- Live ---
+// El panel sigue solo al live actual (el activo o, si no hay, el más reciente, que puede ser uno
+// de respaldo creado al llegar una captura). Si la vendedora elige a mano un live anterior, se
+// queda ahí y se le avisa que hay uno más reciente.
+function nombreLive(id) {
+  const l = estado.lives.find((x) => x.live_id === id);
+  return l ? (l.titulo || 'Live') + ' · ' + dia(l.fecha_operativa) : id;
+}
 async function cargarLives() {
   const r = await consulta('lives');
   if (!r.ok) return;
+  const actual = r.activo || r.lives[0]?.live_id || '';
+  const actualAnterior = estado.liveActual;
   estado.lives = r.lives;
-  if (!estado.live || !r.lives.some((l) => l.live_id === estado.live)) estado.live = r.activo || r.lives[0]?.live_id || '';
+  estado.liveActual = actual;
+  if (!estado.liveFijado || !r.lives.some((l) => l.live_id === estado.live)) {
+    if (actualAnterior && actual !== actualAnterior) toast('Empezó un live nuevo: ' + nombreLive(actual) + '. El tablero ya lo muestra.');
+    estado.live = actual;
+    estado.liveFijado = false;
+  }
   const sel = $('sel-live');
-  sel.innerHTML = r.lives.length
+  const opciones = r.lives.length
     ? r.lives.map((l) => `<option value="${esc(l.live_id)}">${esc(l.titulo || 'Live')} · ${dia(l.fecha_operativa)} · ${esc(l.live_id)}${l.estado === 'activo' ? ' (en vivo)' : ''}</option>`).join('')
     : '<option value="">Todavía no hay lives</option>';
+  if (sel.dataset.firma !== opciones) { sel.innerHTML = opciones; sel.dataset.firma = opciones; }
   sel.value = estado.live;
   const activo = r.lives.find((l) => l.estado === 'activo');
   $('btn-live').textContent = activo ? 'Cerrar live' : 'Iniciar live';
@@ -479,8 +542,41 @@ function pintarLive() {
   const kpi = (v, t) => `<div class="kpi"><b>${v}</b><span>${t}</span></div>`;
   $('kpis').innerHTML = kpi(bs(l.vendido), 'Vendido') + kpi(bs(l.cobrado), 'Cobrado') + kpi(bs(l.pendiente), 'Por cobrar')
     + kpi(l.clientes, 'Clientes') + kpi(l.compras, 'Compras') + kpi(l.cuentas_en_revision, 'Por revisar');
+  pintarOtrosLives();
 }
-$('sel-live').addEventListener('change', (ev) => { estado.live = ev.target.value; pintarLive(); refrescarTab(); });
+// Avisa de lo que queda abierto fuera del live que se está viendo, para que no se pierda nada.
+function pintarOtrosLives() {
+  const avisos = [];
+  if (estado.liveFijado && estado.liveActual && estado.liveActual !== estado.live) {
+    avisos.push(`<span class="aviso-live">Hay un live más reciente: ${esc(nombreLive(estado.liveActual))} <button type="button" data-ir-live="${esc(estado.liveActual)}">Ir</button></span>`);
+  }
+  const otros = estado.lives.filter((x) => x.live_id !== estado.live);
+  const conRevision = otros.filter((x) => Number(x.cuentas_en_revision) > 0);
+  if (conRevision.length) {
+    const n = conRevision.reduce((s, x) => s + Number(x.cuentas_en_revision), 0);
+    avisos.push(`<span class="aviso-live rev">${n} cuenta${n == 1 ? '' : 's'} por revisar en otro${conRevision.length == 1 ? '' : 's'} live${conRevision.length == 1 ? '' : 's'} <button type="button" data-ir-live="${esc(conRevision[0].live_id)}">Ver</button></span>`);
+  }
+  const conSaldo = otros.filter((x) => Number(x.pendiente) > 0 && !conRevision.includes(x));
+  if (conSaldo.length) {
+    const total = conSaldo.reduce((s, x) => s + Number(x.pendiente), 0);
+    avisos.push(`<span class="aviso-live">${bs(total)} por cobrar en otro${conSaldo.length == 1 ? '' : 's'} live${conSaldo.length == 1 ? '' : 's'} <button type="button" data-ir-live="${esc(conSaldo[0].live_id)}">Ver</button></span>`);
+  }
+  const el = $('otros-lives');
+  el.innerHTML = avisos.join('');
+  el.hidden = avisos.length === 0;
+}
+function irALive(id) {
+  estado.live = id;
+  estado.liveFijado = id !== estado.liveActual;
+  $('sel-live').value = id;
+  pintarLive();
+  refrescarTab();
+}
+$('otros-lives').addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-ir-live]');
+  if (b) irALive(b.dataset.irLive);
+});
+$('sel-live').addEventListener('change', (ev) => irALive(ev.target.value));
 $('btn-live').addEventListener('click', async () => {
   if ($('btn-live').dataset.modo === 'cerrar') {
     const d = await confirmar({ titulo: 'Cerrar el live', texto: 'Las capturas que lleguen después se asociarán a este live durante 12 horas (regla de respaldo).', boton: 'Cerrar live' });
@@ -504,21 +600,26 @@ document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () 
 }));
 
 // --- Tablero ---
+// Devuelve false si la respuesta llegó tarde: mientras tanto se cambió de live y no debe pintarse.
 async function cargarCuentas() {
-  const r = await consulta('cuentas', estado.live ? { live_id: estado.live } : {});
-  if (!r.ok && r._status !== 200) return;
+  const live = estado.live;
+  const r = await consulta('cuentas', live ? { live_id: live } : {});
+  if (live !== estado.live) return false;
+  if (!r.ok && r._status !== 200) return false;
   estado.cuentas = r.cuentas || [];
   if (r.live) {
     const i = estado.lives.findIndex((l) => l.live_id === r.live.live_id);
     if (i >= 0) { estado.lives[i] = r.live; pintarLive(); }
   }
+  return true;
 }
 function tarjeta(c) {
   const chips = [];
   if (c.estado === 'parcial') chips.push(`<span class="badge e-parcial">Pagó ${bs(c.monto_confirmado)}</span>`);
   if (c.pago_por_verificar) chips.push('<span class="badge b-rep">Comprobante por verificar</span>');
   if (Number(c.en_revision) > 0) chips.push(`<span class="badge b-rev">${c.en_revision} en revisión</span>`);
-  if (c.control === 'humano') chips.push('<span class="badge b-rev">La atiendes tú</span>');
+  if (String(c.motivos || '').includes('referencia_duplicada')) chips.unshift('<span class="badge alerta">⚠ Posible estafa</span>');
+  if (c.control === 'humano') chips.push('<span class="badge b-rev">Bot en pausa</span>');
   if (c.columna === 'pendientes' && !c.qr_enviado_en) chips.push('<span class="badge e-nueva">Sin QR</span>');
   const motivos = motivosLista(c.motivos);
   return `<button type="button" class="cardc" draggable="${c.columna !== 'pagadas' && c.columna !== 'cerradas'}" data-cuenta="${esc(c.cuenta_id)}" data-columna="${esc(c.columna)}">
@@ -528,18 +629,54 @@ function tarjeta(c) {
     ${motivos.length ? `<span class="meta" style="color:var(--rev-fg)">${esc(motivos.join(' · '))}</span>` : ''}
   </button>`;
 }
-function pintarTablero() {
-  const grupos = { pendientes: [], revision: [], pagadas: [], cerradas: [] };
-  estado.cuentas.forEach((c) => (grupos[c.columna] || grupos.pendientes).push(c));
-  $('tablero').innerHTML = COLUMNAS.map((col) => `
-    <section class="columna" data-columna="${col.id}">
-      <h2><span>${col.titulo}</span><span>${grupos[col.id].length}</span></h2>
-      <div class="cards">${grupos[col.id].map(tarjeta).join('') || '<div class="vacio">Nada aquí.</div>'}</div>
-    </section>`).join('');
-  const cer = $('cerradas');
-  cer.hidden = grupos.cerradas.length === 0;
-  cer.querySelector('summary').textContent = 'Canceladas o vencidas (' + grupos.cerradas.length + ')';
-  cer.querySelector('.cards').innerHTML = grupos.cerradas.map(tarjeta).join('');
+
+// Dibuja el tablero sin recargar la página. Las tarjetas que cambian de columna o desaparecen
+// se desvanecen primero y las que llegan entran resaltadas, para que se vea el movimiento.
+let firmaTablero = '';
+let pintandoTablero = false;
+let repintarTablero = false;
+async function pintarTablero() {
+  if (pintandoTablero) { repintarTablero = true; return; }
+  pintandoTablero = true;
+  try {
+    const firma = estado.live + '|' + JSON.stringify(estado.cuentas);
+    if (firma === firmaTablero) return;
+    const primera = !firmaTablero || firmaTablero.split('|')[0] !== estado.live;
+    firmaTablero = firma;
+    const nuevas = new Map(estado.cuentas.map((c) => [c.cuenta_id, c.columna]));
+    const tarjetas = [...document.querySelectorAll('.cardc[data-cuenta]')];
+    const antes = new Map(tarjetas.map((el) => [el.dataset.cuenta, el.dataset.columna]));
+    if (!primera && !reducirMovimiento) {
+      const salen = tarjetas.filter((el) => nuevas.get(el.dataset.cuenta) !== el.dataset.columna);
+      if (salen.length) { salen.forEach((el) => el.classList.add('sale')); await esperar(280); }
+    }
+
+    const grupos = { pendientes: [], revision: [], pagadas: [], cerradas: [] };
+    estado.cuentas.forEach((c) => (grupos[c.columna] || grupos.pendientes).push(c));
+    $('tablero').innerHTML = COLUMNAS.map((col) => `
+      <section class="columna" data-columna="${col.id}">
+        <h2><span>${col.titulo}</span><span class="cuenta-col">${grupos[col.id].length}</span></h2>
+        <div class="cards">${grupos[col.id].map(tarjeta).join('') || '<div class="vacio">Nada aquí.</div>'}</div>
+      </section>`).join('');
+    const cer = $('cerradas');
+    cer.hidden = grupos.cerradas.length === 0;
+    cer.querySelector('summary').textContent = 'Canceladas o vencidas (' + grupos.cerradas.length + ')';
+    cer.querySelector('.cards').innerHTML = grupos.cerradas.map(tarjeta).join('');
+
+    if (!primera) {
+      document.querySelectorAll('.cardc[data-cuenta]').forEach((el) => {
+        if (antes.get(el.dataset.cuenta) !== el.dataset.columna) el.classList.add('llega');
+      });
+      COLUMNAS.forEach((col) => {
+        const n = grupos[col.id].length;
+        const previas = [...antes.values()].filter((v) => v === col.id).length;
+        if (n !== previas) $('tablero').querySelector(`[data-columna="${col.id}"] .cuenta-col`)?.classList.add('cambia');
+      });
+    }
+  } finally {
+    pintandoTablero = false;
+    if (repintarTablero) { repintarTablero = false; pintarTablero(); }
+  }
 }
 document.addEventListener('click', (ev) => {
   const card = ev.target.closest('[data-cuenta]');
@@ -556,7 +693,10 @@ document.addEventListener('dragstart', (ev) => {
   ev.dataTransfer.effectAllowed = 'move';
   ev.dataTransfer.setData('text/plain', card.dataset.cuenta);
 });
-document.addEventListener('dragend', (ev) => { ev.target.closest?.('[data-cuenta]')?.classList.remove('arrastrando'); });
+document.addEventListener('dragend', (ev) => {
+  ev.target.closest?.('[data-cuenta]')?.classList.remove('arrastrando');
+  setTimeout(() => { arrastrada = null; refrescoPendiente(); }, 0);
+});
 $('tablero').addEventListener('dragover', (ev) => {
   const col = ev.target.closest('.columna');
   if (!col || !arrastrada) return;
@@ -580,52 +720,153 @@ async function mover(cuentaId, desde, hacia, datos) {
   if (!c) return;
   const quien = esc(c.cliente || c.nicknames || c.whatsapp);
   if (hacia === 'pagadas') {
-    const d = await confirmar({
-      titulo: 'Marcar la cuenta como pagada',
-      texto: `Cuenta de <b>${quien}</b> por <b>${bs(c.saldo)}</b>. Úsalo solo después de ver el dinero en tu banco o Yape.`,
-      campos: chkAvisar(true), boton: 'Marcar pagada' });
-    if (d) await hacer({ accion: 'cuenta_pagada', cuenta_id: cuentaId, nota: d.nota, notificar_cliente: d.notificar_cliente }, 'Cuenta marcada como pagada.');
+    await confirmarPagoCuenta(c);
   } else if (hacia === 'revision') {
-    const d = await confirmar({ titulo: 'Atender tú a este cliente',
-      texto: `El bot dejará de responderle a <b>${quien}</b> hasta que lo devuelvas al agente. Escríbele tú por WhatsApp.`, boton: 'Tomar conversación' });
-    if (d) await hacer({ accion: 'cuenta_revision', cuenta_id: cuentaId, nota: d.nota }, 'Ahora atiendes tú a este cliente.');
+    const d = await confirmar({ titulo: 'Pausar el bot para este cliente',
+      texto: `El bot dejará de responderle automáticamente a <b>${quien}</b>. Escríbele tú por WhatsApp. Cuando termines, usa «Reactivar bot».`, boton: 'Pausar bot' });
+    if (d) await hacer({ accion: 'cuenta_revision', cuenta_id: cuentaId, nota: d.nota }, 'Bot en pausa: ahora atiendes tú a este cliente.');
   } else if (hacia === 'pendientes') {
     if (desde === 'pagadas') { toast('Para reabrir una cuenta pagada, cambia el estado de sus compras desde el detalle.', true); return; }
     await devolverAgente(c.whatsapp, quien, cuentaId);
   }
 }
+
+// Único camino para confirmar un pago (botón "Confirmar pago" y arrastrar a "Pagadas").
+// Usa el comprobante pendiente de la cuenta si lo hay; el monto es lo que la vendedora vio en
+// su banco: si cubre el saldo la cuenta queda pagada, si es menor queda con pago parcial.
+async function confirmarPagoCuenta(c) {
+  const quien = esc(c.cliente || c.nicknames || ('+' + c.whatsapp));
+  const pp = c.pago_pendiente;
+  const texto = pp
+    ? `Cuenta de <b>${quien}</b> · saldo <b>${bs(c.saldo)}</b>.<br>Comprobante recibido por <b>${bs(pp.monto_pagado)}</b> (${fecha(pp.fecha_recepcion)}). Escribe el monto que <b>viste en tu banco o Yape</b>.`
+    : `Cuenta de <b>${quien}</b> · saldo <b>${bs(c.saldo)}</b>.<br>No llegó comprobante: escribe el monto que <b>recibiste</b>.`;
+  const sugerido = pp && Number(pp.monto_pagado) > 0 ? pp.monto_pagado : c.saldo;
+  const d = await confirmar({
+    titulo: 'Confirmar pago', texto,
+    campos: `<label>Monto recibido (Bs)<input class="campo" inputmode="decimal" data-campo="monto" value="${esc(sugerido)}"></label>
+             <div class="hint" style="margin-top:6px">Si es menor al saldo, la cuenta queda con pago parcial.</div>` + chkAvisar(true),
+    boton: 'Confirmar pago' });
+  if (!d) return;
+  const monto = String(d.monto).replace(',', '.').trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(monto) || Number(monto) <= 0) { toast('El monto no es válido.', true); return; }
+  await hacer({ accion: 'confirmar_pago_cuenta', cuenta_id: c.cuenta_id, monto, nota: d.nota, notificar_cliente: d.notificar_cliente },
+    (r) => 'Pago confirmado.' + (Number(r.saldo_pendiente) > 0 ? ' Le falta pagar ' + bs(r.saldo_pendiente) + '.' : ' Cuenta al día.'));
+}
 async function devolverAgente(whatsapp, quien, cuentaId) {
-  const d = await confirmar({ titulo: 'Devolver al agente',
-    texto: `Lo que estaba en revisión de <b>${quien}</b> vuelve a «Confirmada» y el bot retoma la conversación.`,
-    campos: '<label><input type="checkbox" data-campo="enviar_qr" checked> Enviarle el QR con su total a pagar</label>', boton: 'Devolver' });
+  const d = await confirmar({ titulo: 'Reactivar el bot',
+    texto: `El bot volverá a responder automáticamente a <b>${quien}</b>. Lo que estaba en revisión vuelve a «Confirmada».`,
+    campos: '<label><input type="checkbox" data-campo="enviar_qr" checked> Enviarle el QR con su total a pagar</label>', boton: 'Reactivar bot' });
   if (d) await hacer({ accion: 'devolver_agente', cuenta_id: cuentaId, whatsapp, enviar_qr: d.enviar_qr, nota: d.nota },
-    (r) => 'El agente retoma la conversación.' + (r.qr_enviado ? ' Se envió el QR (' + bs(r.total_a_pagar) + ').' : ''));
+    (r) => 'Bot reactivado.' + (r.qr_enviado ? ' Se envió el QR (' + bs(r.total_a_pagar) + ').' : ''));
 }
 
 // --- Detalle de cuenta ---
+// Orden pensado para actuar rápido: Acciones, Comprobantes, Conversación, Cuenta (con sus
+// compras), Cliente e Historial. Se actualiza solo mientras está abierto.
+let firmaCuenta = '';
+const imagenesCargadas = new Map();   // 'pago:<id>' | 'cap:<id>' -> html ya cargado
 async function abrirCuenta(id) {
+  if (estado.cuentaAbierta !== id) { firmaCuenta = ''; }
   estado.cuentaAbierta = id;
   const dlg = $('dlg-cuenta');
-  if (!dlg.open) { $('cuenta-titulo').textContent = 'Cargando…'; $('cuenta-body').innerHTML = ''; dlg.showModal(); }
+  if (!dlg.open) { $('cuenta-titulo').textContent = 'Cargando…'; $('cuenta-body').innerHTML = ''; dlg.showModal(); dlg.scrollTop = 0; }
+  await actualizarCuentaAbierta(true);
+}
+async function actualizarCuentaAbierta(forzar = false) {
+  const id = estado.cuentaAbierta;
+  if (!id) return;
+  // No se redibuja mientras la vendedora escribe en un campo del detalle.
+  if (!forzar && $('cuenta-body').contains(document.activeElement) && document.activeElement.matches('input, textarea, select')) {
+    hayRefrescoPendiente = true;
+    return;
+  }
   try {
     const d = await consulta('cuenta', { id });
+    if (estado.cuentaAbierta !== id) return;
     if (!d.ok) { $('cuenta-body').innerHTML = '<div class="vacio">No se encontró la cuenta.</div>'; return; }
+    const firma = JSON.stringify(d);
+    if (firma === firmaCuenta) return;
+    firmaCuenta = firma;
     pintarCuenta(d);
   } catch (e) {
     if (e.message !== 'Clave incorrecta') $('cuenta-body').innerHTML = `<div class="vacio">${esc(e.message)}</div>`;
   }
 }
-$('dlg-cuenta').addEventListener('close', () => { estado.cuentaAbierta = null; });
+$('dlg-cuenta').addEventListener('close', () => { estado.cuentaAbierta = null; firmaCuenta = ''; });
+
+function chatHtml(mensajes) {
+  if (!mensajes.length) return '<div class="hint">Sin mensajes registrados todavía.</div>';
+  return mensajes.map((m) => `<div class="burbuja ${m.direccion}">${esc(m.texto || (m.tipo === 'imagen' ? '[imagen]' : m.tipo === 'documento' ? '[documento]' : '[' + (m.tipo || 'mensaje') + ']'))}<time>${fecha(m.fecha)}</time></div>`).join('');
+}
+// Pinta la conversación conservando la posición: si estaba al final, sigue al final.
+function pintarChat(caja, mensajes) {
+  if (!caja) return;
+  const alFinal = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 40 || !caja.childElementCount;
+  const pos = caja.scrollTop;
+  caja.innerHTML = chatHtml(mensajes);
+  caja.scrollTop = alFinal ? caja.scrollHeight : pos;
+}
 
 function pintarCuenta(d) {
   const c = d.cuenta, cl = d.cliente;
   const quien = cl.nombre_real || cl.push_name || ('+' + cl.whatsapp);
+  const pp = c.pago_pendiente;
+  const abierta = !['pagada', 'cancelada', 'vencida'].includes(c.estado) && Number(c.saldo) > 0;
+  estado.mensajesCuenta = d.mensajes;
   $('cuenta-titulo').textContent = quien + ' · ' + bs(c.subtotal);
-  let h = `
-  <div class="sec">
+
+  // 1. Acciones
+  let h = `<div class="sec sec-acciones">
+    <div class="resumen-acc">
+      ${badge(c.estado, ESTADOS_CUENTA)}
+      <span>Saldo <b>${bs(c.saldo)}</b></span>
+      ${pp ? `<span class="badge b-rep">Comprobante por ${bs(pp.monto_pagado)} sin verificar</span>` : ''}
+      ${cl.control === 'humano' ? '<span class="badge b-rev">Bot en pausa: la atiendes tú</span>' : ''}
+    </div>
+    <div class="fila">
+      ${abierta ? '<button class="btn primary" type="button" data-acc="pagar">Confirmar pago…</button>' : ''}
+      ${cl.control === 'humano'
+        ? '<button class="btn" type="button" data-acc="devolver" title="El bot vuelve a responder automáticamente a este cliente">Reactivar bot</button>'
+        : '<button class="btn" type="button" data-acc="tomar" title="El bot deja de responder a este cliente y le escribes tú">Pausar bot (atiendo yo)</button>'}
+      ${Number(cl.total_a_pagar) > 0 ? '<button class="btn" type="button" data-acc="qr">Reenviar QR</button>' : ''}
+    </div>
+  </div>`;
+
+  // 2. Comprobantes (solo información; la confirmación está en Acciones)
+  if (d.pagos.length) {
+    h += `<div class="sec"><h3>Comprobantes</h3>` + d.pagos.map((p) => {
+      const repetido = String(p.motivo_revision || '').includes('referencia_duplicada');
+      const motivos = motivosLista(String(p.motivo_revision || '').split(',').filter((m) => m.trim() !== 'referencia_duplicada').join(','));
+      return `<div class="subcard">
+        <div class="fila" style="justify-content:space-between"><b>${bs(p.monto_pagado)}</b>${badge(p.estado_pago, ESTADOS_PAGO)}</div>
+        ${repetido && p.estado_pago !== 'verificado' ? alertaEstafa(p) : ''}
+        ${motivos.length ? `<div class="aviso">Revisa antes de confirmar:<ul>${motivos.map((m) => `<li>${esc(m)}</li>`).join('')}</ul></div>` : ''}
+        ${p.resultado === 'parcial' && p.estado_pago !== 'verificado' ? `<div class="hint">Pago parcial: esperaba ${bs(p.monto_esperado)}.</div>` : ''}
+        ${p.resultado === 'manual' ? '<div class="hint">Registrado por ti desde el panel (sin comprobante).</div>' : ''}
+        ${p.estado_pago === 'verificado' ? `<div class="ok-nota">Verificado ${fecha(p.fecha_verificacion)}: ${bs(p.monto_confirmado)}${p.excedente ? ' · excedente ' + bs(p.excedente) : ''}</div>` : ''}
+        ${p.resultado !== 'manual' ? `<dl class="kv">
+          <dt>Enviado por</dt><dd>${esc(p.enviado_por || '—')}</dd>
+          <dt>Destinatario</dt><dd>${esc(p.receptor_comprobante || '—')}</dd>
+          <dt>Referencia</dt><dd>${esc(p.referencia_pago || '—')}</dd>
+          <dt>Fecha / banco</dt><dd>${esc(p.fecha_comprobante || '—')} · ${esc(p.banco_app || '—')}</dd>
+          <dt>Recibido</dt><dd>${fecha(p.fecha_recepcion)}</dd>
+        </dl>` : ''}
+        ${p.tiene_comprobante ? `<div class="img-caja" data-comprobante="${esc(p.pago_id)}"><button class="btn small" type="button" data-ver-comprobante="${esc(p.pago_id)}">Ver comprobante</button></div>` : ''}
+      </div>`;
+    }).join('') + `</div>`;
+  }
+
+  // 3. Conversación
+  h += `<div class="sec">
+    <h3 class="h3-fila"><span>Conversación de WhatsApp</span>
+      ${d.mensajes.length ? '<button class="btn small" type="button" data-acc="ampliar" title="Ver la conversación en grande">⤢ Ampliar</button>' : ''}</h3>
+    <div class="chat" id="chat-cuenta"></div>
+  </div>`;
+
+  // 4. Cuenta y sus compras
+  h += `<div class="sec">
     <h3>Cuenta ${esc(c.cuenta_id)}</h3>
     <dl class="kv">
-      <dt>Estado</dt><dd>${badge(c.estado, ESTADOS_CUENTA)}</dd>
       <dt>Live</dt><dd>${esc(c.live_id)} · ${dia(c.fecha_operativa)}</dd>
       <dt>Total</dt><dd>${bs(c.subtotal)}</dd>
       <dt>Pagado (verificado)</dt><dd>${bs(c.monto_confirmado)}</dd>
@@ -633,56 +874,7 @@ function pintarCuenta(d) {
       <dt>Plazo de pago</dt><dd>${fecha(c.fecha_limite_pago)}</dd>
       <dt>QR enviado</dt><dd>${c.qr_enviado_en ? fecha(c.qr_enviado_en) : 'Todavía no'}</dd>
     </dl>
-  </div>
-  <div class="sec">
-    <h3>Cliente</h3>
-    <dl class="kv">
-      <dt>WhatsApp</dt><dd><a href="https://wa.me/${esc(cl.whatsapp)}" target="_blank" rel="noopener">+${esc(cl.whatsapp)}</a></dd>
-      <dt>Nombre en WhatsApp</dt><dd>${esc(cl.push_name || '—')}</dd>
-      <dt>Nombre real</dt><dd>${cl.nombre_real ? esc(cl.nombre_real) : '<span class="hint">Sin completar (cliente provisional)</span>'}</dd>
-      <dt>Nicknames de TikTok</dt><dd>${cl.nicknames.map((n) => esc(n.nickname) + ' <span class="hint">(' + n.capturas + ')</span>').join(', ') || '—'}</dd>
-      <dt>Conversación</dt><dd>${cl.control === 'humano' ? '<span class="badge b-rev">La atiendes tú (el bot no responde)</span>' : '<span class="badge e-confirmada">Bot</span>'}</dd>
-      <dt>Total a pagar (todas sus cuentas)</dt><dd>${bs(cl.total_a_pagar)}</dd>
-    </dl>
-    <div class="fila" style="margin-top:10px">
-      <input class="campo" id="nombre-real" placeholder="Nombre real" value="${esc(cl.nombre_real || '')}">
-      <button class="btn small" type="button" data-acc="nombre">Guardar nombre</button>
-    </div>
-  </div>`;
-
-  // Acciones de la cuenta
-  h += `<div class="sec"><h3>Acciones</h3><div class="fila">`;
-  if (!['pagada', 'cancelada', 'vencida'].includes(c.estado)) h += `<button class="btn primary" type="button" data-acc="pagada">Marcar cuenta pagada</button>`;
-  h += cl.control === 'humano'
-    ? `<button class="btn" type="button" data-acc="devolver">Devolver al agente</button>`
-    : `<button class="btn" type="button" data-acc="tomar">Atender yo</button>`;
-  if (Number(cl.total_a_pagar) > 0) h += `<button class="btn" type="button" data-acc="qr">Reenviar QR</button>`;
-  h += `</div></div>`;
-
-  // Pagos
-  if (d.pagos.length) {
-    h += `<div class="sec"><h3>Comprobantes</h3>` + d.pagos.map((p) => {
-      const motivos = motivosLista(p.motivo_revision);
-      return `<div class="subcard">
-        <div class="fila" style="justify-content:space-between"><b>${bs(p.monto_pagado)}</b>${badge(p.estado_pago, ESTADOS_PAGO)}</div>
-        ${motivos.length ? `<div class="aviso">Revisa antes de confirmar:<ul>${motivos.map((m) => `<li>${esc(m)}</li>`).join('')}</ul></div>` : ''}
-        ${p.resultado === 'parcial' && p.estado_pago !== 'verificado' ? `<div class="hint">Pago parcial: esperaba ${bs(p.monto_esperado)}.</div>` : ''}
-        ${p.estado_pago === 'verificado' ? `<div class="ok-nota">Verificado ${fecha(p.fecha_verificacion)}: ${bs(p.monto_confirmado)}${p.excedente ? ' · excedente ' + bs(p.excedente) : ''}</div>` : ''}
-        <dl class="kv">
-          <dt>Enviado por</dt><dd>${esc(p.enviado_por || '—')}</dd>
-          <dt>Destinatario</dt><dd>${esc(p.receptor_comprobante || '—')}</dd>
-          <dt>Referencia</dt><dd>${esc(p.referencia_pago || '—')}</dd>
-          <dt>Fecha / banco</dt><dd>${esc(p.fecha_comprobante || '—')} · ${esc(p.banco_app || '—')}</dd>
-          <dt>Recibido</dt><dd>${fecha(p.fecha_recepcion)}</dd>
-        </dl>
-        ${p.tiene_comprobante ? `<div class="img-caja" data-comprobante="${esc(p.pago_id)}"><button class="btn small" type="button" data-ver-comprobante="${esc(p.pago_id)}">Ver comprobante</button></div>` : ''}
-        ${p.estado_pago !== 'verificado' ? `<div class="fila"><button class="btn primary" type="button" data-confirmar-pago="${esc(p.pago_id)}" data-monto="${esc(p.monto_pagado ?? '')}">Confirmar pago…</button></div>` : ''}
-      </div>`;
-    }).join('') + `</div>`;
-  }
-
-  // Compras
-  h += `<div class="sec"><h3>Compras</h3>` + d.capturas.map((x) => `
+    <h3 style="margin-top:14px">Compras</h3>` + d.capturas.map((x) => `
     <div class="subcard">
       <div class="fila" style="justify-content:space-between">
         <span><b>${esc(x.nickname || 'Sin nickname')}</b> · ${bs(x.precio)}${Number(x.confirmado) > 0 && x.estado_captura !== 'pagada' ? ' <span class="hint">(pagado ' + bs(x.confirmado) + ')</span>' : ''}</span>
@@ -696,11 +888,23 @@ function pintarCuenta(d) {
       <div class="img-caja" data-captura-img="${esc(x.captura_id)}"></div>
     </div>`).join('') + `</div>`;
 
-  // Conversación
-  h += `<div class="sec"><h3>Conversación de WhatsApp</h3>` + (d.mensajes.length
-    ? `<div class="chat">${d.mensajes.map((m) => `<div class="burbuja ${m.direccion}">${esc(m.texto || (m.tipo === 'imagen' ? '[imagen]' : m.tipo === 'documento' ? '[documento]' : '[' + (m.tipo || 'mensaje') + ']'))}<time>${fecha(m.fecha)}</time></div>`).join('')}</div>`
-    : '<div class="hint">Sin mensajes registrados todavía.</div>') + `</div>`;
+  // 5. Cliente
+  h += `<div class="sec">
+    <h3>Cliente</h3>
+    <dl class="kv">
+      <dt>WhatsApp</dt><dd><a href="https://wa.me/${esc(cl.whatsapp)}" target="_blank" rel="noopener">+${esc(cl.whatsapp)}</a></dd>
+      <dt>Nombre en WhatsApp</dt><dd>${esc(cl.push_name || '—')}</dd>
+      <dt>Nombre real</dt><dd>${cl.nombre_real ? esc(cl.nombre_real) : '<span class="hint">Sin completar (cliente provisional)</span>'}</dd>
+      <dt>Nicknames de TikTok</dt><dd>${cl.nicknames.map((n) => esc(n.nickname) + ' <span class="hint">(' + n.capturas + ')</span>').join(', ') || '—'}</dd>
+      <dt>Total a pagar (todas sus cuentas)</dt><dd>${bs(cl.total_a_pagar)}</dd>
+    </dl>
+    <div class="fila" style="margin-top:10px">
+      <input class="campo" id="nombre-real" placeholder="Nombre real" value="${esc(cl.nombre_real || '')}">
+      <button class="btn small" type="button" data-acc="nombre">Guardar nombre</button>
+    </div>
+  </div>`;
 
+  // 6. Historial
   if (d.historial.length) {
     h += `<div class="sec"><h3>Historial</h3><ul class="hist">${d.historial.map((a) => `
       <li><strong>${esc(ACCIONES[a.accion] || a.accion)}</strong> · <span class="hint">${fecha(a.fecha)}</span>
@@ -710,9 +914,50 @@ function pintarCuenta(d) {
         ${a.detalle?.nota ? `<br><span class="hint">Nota: ${esc(a.detalle.nota)}</span>` : ''}</li>`).join('')}</ul></div>`;
   }
 
+  const dlg = $('dlg-cuenta');
+  const scroll = dlg.scrollTop;
+  const chatAnterior = $('chat-cuenta');
+  const chatEstado = chatAnterior ? { top: chatAnterior.scrollTop, alFinal: chatAnterior.scrollHeight - chatAnterior.scrollTop - chatAnterior.clientHeight < 40 } : null;
   $('cuenta-body').innerHTML = h;
-  $('cuenta-body').dataset.info = JSON.stringify({ cuenta_id: c.cuenta_id, whatsapp: cl.whatsapp, quien, saldo: c.saldo, total: cl.total_a_pagar });
-  if (d.mensajes.length) { const chat = $('cuenta-body').querySelector('.chat'); chat.scrollTop = chat.scrollHeight; }
+  $('cuenta-body').dataset.info = JSON.stringify({ cuenta_id: c.cuenta_id, whatsapp: cl.whatsapp, quien, saldo: c.saldo,
+    total: cl.total_a_pagar, cliente: quien, pago_pendiente: pp || null });
+
+  // Imágenes ya abiertas: se vuelven a mostrar sin pedirlas otra vez.
+  imagenesCargadas.forEach((html, clave) => {
+    const [tipo, id] = clave.split(':');
+    const caja = tipo === 'pago'
+      ? $('cuenta-body').querySelector(`[data-comprobante="${CSS.escape(id)}"]`)
+      : $('cuenta-body').querySelector(`[data-captura-img="${CSS.escape(id)}"]`);
+    if (caja) {
+      caja.innerHTML = html;
+      if (tipo === 'cap') $('cuenta-body').querySelector(`[data-ver-captura="${CSS.escape(id)}"]`)?.remove();
+    }
+  });
+
+  const chat = $('chat-cuenta');
+  chat.innerHTML = chatHtml(d.mensajes);
+  chat.scrollTop = !chatEstado || chatEstado.alFinal ? chat.scrollHeight : chatEstado.top;
+  if ($('dlg-chat').open) pintarChat($('chat-grande'), d.mensajes);
+  dlg.scrollTop = scroll;
+}
+
+// Aviso de comprobante repetido: el mismo número de operación ya se usó en otro pago.
+// Solo lo ve la vendedora; al cliente nunca se le dice nada parecido (D-15).
+function alertaEstafa(p) {
+  const o = p.referencia_repetida;
+  const anterior = o
+    ? `<b>${esc(o.cliente || ('+' + o.whatsapp))}</b> · ${bs(o.monto_pagado)} · ${fecha(o.fecha_recepcion)} (${esc(ESTADOS_PAGO[o.estado_pago] || o.estado_pago)})`
+    : 'un pago registrado antes';
+  const quien = !o ? ''
+    : o.mismo_cliente
+      ? '<p>Lo envió <b>el mismo cliente</b>: puede ser que haya reenviado el mismo comprobante por error, o que intente que un solo pago cubra otra compra.</p>'
+      : '<p>Lo usó <b>otro cliente</b>: alguien podría estar enviando el comprobante de otra persona.</p>';
+  return `<div class="alerta-estafa">
+    <strong>⚠ Posible estafa: comprobante repetido</strong>
+    <p>El número de operación <b>${esc(p.referencia_pago || '—')}</b> de este comprobante ya aparece en un pago anterior: ${anterior}.</p>
+    ${quien}
+    <p>Un mismo pago no puede usarse dos veces. <b>No confirmes este pago</b> hasta comprobar en tu banco o Yape que este dinero llegó por separado. Si no llegó, habla tú con el cliente (el bot no le responde mientras está en revisión).</p>
+  </div>`;
 }
 
 function base64ABlobUrl(b64, mime) {
@@ -733,36 +978,26 @@ $('cuenta-body').addEventListener('click', async (ev) => {
     caja.innerHTML = r.tipo === 'pdf'
       ? `<a class="btn small" href="${url}" target="_blank" rel="noopener" download="comprobante.pdf">Abrir comprobante (PDF)</a>`
       : `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="Comprobante de pago"></a>`;
+    imagenesCargadas.set('pago:' + b.dataset.verComprobante, caja.innerHTML);
     return;
   }
   if (b.dataset.verCaptura) {
-    const caja = $('cuenta-body').querySelector(`[data-captura-img="${CSS.escape(b.dataset.verCaptura)}"]`);
+    const id = b.dataset.verCaptura;
+    const caja = $('cuenta-body').querySelector(`[data-captura-img="${CSS.escape(id)}"]`);
     caja.innerHTML = '<span class="hint">Cargando…</span>';
-    const r = await consulta('captura_imagen', { id: b.dataset.verCaptura });
+    const r = await consulta('captura_imagen', { id });
     if (!r.ok) { caja.innerHTML = '<span class="hint">No hay imagen guardada.</span>'; return; }
     const url = base64ABlobUrl(r.imagen_base64, r.mime_type);
     caja.innerHTML = `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="Captura del live"></a>`;
+    imagenesCargadas.set('cap:' + id, caja.innerHTML);
     b.remove();
     return;
   }
   if (b.dataset.compra) { abrirCompra(b.dataset.compra); return; }
-  if (b.dataset.confirmarPago) {
-    const d = await confirmar({
-      titulo: 'Confirmar pago',
-      texto: 'Escribe el monto que <b>viste en tu banco o Yape</b>. Si es menor a lo que debe, la cuenta queda con pago parcial.',
-      campos: `<label>Monto recibido (Bs)<input class="campo" inputmode="decimal" data-campo="monto" value="${esc(b.dataset.monto)}"></label>` + chkAvisar(true),
-      boton: 'Confirmar pago' });
-    if (!d) return;
-    const monto = String(d.monto).replace(',', '.').trim();
-    if (!/^\d+(\.\d{1,2})?$/.test(monto) || Number(monto) <= 0) { toast('El monto no es válido.', true); return; }
-    await hacer({ accion: 'confirmar_pago', pago_id: b.dataset.confirmarPago, monto, nota: d.nota, notificar_cliente: d.notificar_cliente },
-      (r) => 'Pago confirmado.' + (Number(r.saldo_pendiente) > 0 ? ' Le falta pagar ' + bs(r.saldo_pendiente) + '.' : ' Cuenta al día.'));
-    return;
-  }
 
   const acc = b.dataset.acc;
-  const datos = { cuenta_id: info.cuenta_id, whatsapp: info.whatsapp, cliente: info.quien, saldo: info.saldo };
-  if (acc === 'pagada') await mover(info.cuenta_id, 'pendientes', 'pagadas', datos);
+  const datos = { cuenta_id: info.cuenta_id, whatsapp: info.whatsapp, cliente: info.quien, saldo: info.saldo, pago_pendiente: info.pago_pendiente };
+  if (acc === 'pagar') await confirmarPagoCuenta(datos);
   else if (acc === 'tomar') await mover(info.cuenta_id, 'pendientes', 'revision', datos);
   else if (acc === 'devolver') await devolverAgente(info.whatsapp, esc(info.quien), info.cuenta_id);
   else if (acc === 'qr') {
@@ -770,6 +1005,12 @@ $('cuenta-body').addEventListener('click', async (ev) => {
     if (d) await hacer({ accion: 'reenviar_qr', cuenta_id: info.cuenta_id, nota: d.nota }, 'QR enviado.');
   } else if (acc === 'nombre') {
     await hacer({ accion: 'cliente_editar', whatsapp: info.whatsapp, nombre_real: $('nombre-real').value }, 'Nombre guardado.');
+  } else if (acc === 'ampliar') {
+    $('chat-titulo').textContent = 'Conversación con ' + info.quien;
+    $('dlg-chat').showModal();
+    const grande = $('chat-grande');
+    grande.innerHTML = '';
+    pintarChat(grande, estado.mensajesCuenta || []);
   }
 });
 
@@ -901,34 +1142,97 @@ $('btn-csv').addEventListener('click', () => {
   a.remove();
 });
 
-// --- Refresco ---
+// --- Tiempo real ---
+// Cada 3 s se consulta un contador de cambios de la base (muy liviano). Solo si cambió se
+// recargan los datos: las tarjetas aparecen, se mueven de columna o desaparecen solas, y el
+// detalle abierto se actualiza. No se interrumpe a la vendedora: mientras arrastra una tarjeta,
+// tiene abierta una confirmación o escribe en un campo, el refresco espera.
+const reducirMovimiento = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+const INTERVALO_VIVO = 3000;
+// Con la pestaña en segundo plano se sigue consultando (la consulta es mínima) y el título de la
+// pestaña muestra cuántas novedades hubo, p. ej. "(3) Panel de ventas".
+const INTERVALO_OCULTO = 4000;
+const TITULO = document.title;
+let novedadesOcultas = 0;
+function avisarEnTitulo() {
+  document.title = novedadesOcultas > 0 ? '(' + novedadesOcultas + ') ' + TITULO : TITULO;
+}
+let versionVista = null;
+let temporizador = null;
+let hayRefrescoPendiente = false;
+let refrescando = false;
+
 async function refrescarTab() {
   try {
-    if (estado.tab === 'tablero') { await cargarCuentas(); pintarTablero(); }
+    if (estado.tab === 'tablero') { if (await cargarCuentas()) await pintarTablero(); }
     else if (estado.tab === 'compras') await cargarCompras();
-    else { await cargarCuentas(); pintarReporte(); }
-    $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
+    else if (await cargarCuentas()) pintarReporte();
+    $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   } catch (e) {
     if (e.message !== 'Clave incorrecta') toast(e.message, true);
   }
 }
+// Recarga todo lo visible (también tras cada acción de la vendedora).
 async function refrescar() {
-  try { await cargarLives(); } catch (e) { if (e.message !== 'Clave incorrecta') toast(e.message, true); }
-  await refrescarTab();
-  if (estado.cuentaAbierta) await abrirCuenta(estado.cuentaAbierta);
+  if (refrescando) { hayRefrescoPendiente = true; return; }
+  refrescando = true;
+  try {
+    try { await cargarLives(); } catch (e) { if (e.message !== 'Clave incorrecta') toast(e.message, true); }
+    await refrescarTab();
+    if (estado.cuentaAbierta) await actualizarCuentaAbierta();
+  } finally {
+    refrescando = false;
+  }
 }
-$('btn-recargar').addEventListener('click', refrescar);
+function ocupada() {
+  return arrastrada || $('dlg-confirmar').open;
+}
+// Si un refresco quedó en espera (arrastre, confirmación o escritura), se hace ahora.
+function refrescoPendiente() {
+  if (hayRefrescoPendiente && !ocupada()) { hayRefrescoPendiente = false; refrescar(); }
+}
+function marcarConexion(ok) {
+  const el = $('en-vivo');
+  el.classList.toggle('caido', !ok);
+  el.lastChild.textContent = ok ? ' En vivo' : ' Sin conexión, reintentando…';
+}
+async function vigilar() {
+  clearTimeout(temporizador);
+  if (!estado.clave) return;
+  try {
+    const r = await consulta('version');
+    marcarConexion(!!r.ok);
+    if (r.ok && r.version !== versionVista) {
+      const primera = versionVista === null;
+      versionVista = r.version;
+      if (!primera && document.hidden) { novedadesOcultas++; avisarEnTitulo(); }
+      if (!primera) {
+        if (ocupada()) hayRefrescoPendiente = true;
+        else await refrescar();
+      }
+    }
+    refrescoPendiente();
+  } catch (e) {
+    if (e.message === 'Clave incorrecta') return;
+    marcarConexion(false);
+  }
+  temporizador = setTimeout(vigilar, document.hidden ? INTERVALO_OCULTO : INTERVALO_VIVO);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  novedadesOcultas = 0;
+  avisarEnTitulo();
+  if (estado.clave) vigilar();
+});
+document.addEventListener('focusout', () => setTimeout(refrescoPendiente, 0));
 
-let intervalo;
 function entrar() {
   $('vista-login').hidden = true;
   $('vista-app').hidden = false;
+  versionVista = null;
   refrescar();
-  clearInterval(intervalo);
-  // Refresca cada 30 s para ver compras y pagos nuevos durante el live (sin interrumpir un modal abierto).
-  intervalo = setInterval(() => {
-    if (!document.hidden && estado.clave && !$('dlg-confirmar').open && !estado.cuentaAbierta && !estado.compraAbierta) refrescar();
-  }, 30000);
+  vigilar();
 }
 
 estado.clave = leerClave();

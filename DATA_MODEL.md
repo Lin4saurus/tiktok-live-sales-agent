@@ -18,6 +18,11 @@ afectan al modelo en `DECISIONS.md`.
 | `003_funciones_negocio.sql` | `fn_registrar_pago`, `fn_confirmar_pago`, `fn_vencer_cuentas` y utilidades. |
 | `004_panel.sql` | `fn_panel_consulta`, `fn_panel_accion`, columna del tablero e indicadores del live. |
 | `005_panel_web.sql` | Tabla `panel_recursos` con la página web del panel. |
+| `007_whatsapp_cloud.sql` | Tabla `configuracion_whatsapp` (proveedor evolution/cloud, graph_version, phone_number_id, waba_id, verify_token, plantilla) y `fn_config_whatsapp()`. |
+| `006_tiempo_real.sql` | Secuencia `panel_cambios` y triggers por sentencia que la avanzan en cada cambio (tiempo real del panel). |
+
+> Aplicar siempre con `db\aplicar_migraciones.ps1` (copia el archivo al contenedor). Pasar el
+> SQL por una tubería de Windows PowerShell convierte tildes y ñ en `?`.
 
 Instalación nueva: `init-db.sh` crea la base y luego `db\aplicar_migraciones.ps1 -Desde 1`.
 002–005 son idempotentes. La página del panel se carga con `db\cargar_panel.ps1`.
