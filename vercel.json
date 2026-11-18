@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo sin dependencias",
+  "buildCommand": "node demo/armar.mjs",
+  "outputDirectory": "public",
+  "cleanUrls": true
+}

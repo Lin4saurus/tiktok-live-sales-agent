@@ -25,3 +25,6 @@ pruebas_vision/
 # Archivos temporales
 *.log
 .DS_Store
+# Demo armada para Vercel (se genera con node demo/armar.mjs)
+public/
+.vercel/
