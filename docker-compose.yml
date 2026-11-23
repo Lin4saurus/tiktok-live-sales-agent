@@ -1,0 +1,107 @@
+# Los secretos se leen de .env (ignorado por git). Plantilla: .env.example.
+# Postgres y Evolution solo escuchan en esta PC (127.0.0.1).
+
+services:
+  # ─── PostgreSQL (base de datos para n8n, Evolution API y ventas) ───
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: postgres
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── n8n (orquestador) ───
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_HOST: 127.0.0.1
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      # Zona horaria de operación (Bolivia). La base guarda las fechas en UTC.
+      GENERIC_TIMEZONE: ${TZ_OPERACION:-America/La_Paz}
+      TZ: ${TZ_OPERACION:-America/La_Paz}
+      N8N_SECURE_COOKIE: false
+      # Conexión a PostgreSQL (en vez de SQLite)
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: postgres
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── Evolution API v2 (WhatsApp) ───
+  evolution-api:
+    image: evoapicloud/evolution-api:v2.3.4
+    container_name: evolution-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SERVER_URL: http://127.0.0.1:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?Falta EVOLUTION_API_KEY en .env}
+      DATABASE_ENABLED: true
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/evolution
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+      DATABASE_SAVE_DATA_INSTANCE: true
+      DATABASE_SAVE_DATA_NEW_MESSAGE: true
+      DATABASE_SAVE_MESSAGE_UPDATE: true
+      DATABASE_SAVE_DATA_CONTACTS: true
+      DATABASE_SAVE_DATA_CHATS: true
+      CACHE_REDIS_ENABLED: false
+      CACHE_LOCAL_ENABLED: true
+      RABBITMQ_ENABLED: false
+      CHATWOOT_ENABLED: false
+    volumes:
+      - ./evolution_instances:/evolution/instances
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── Respaldo de la base «ventas» del panel TikTok (botón del panel + automático y por Gmail) ───
+  # Usa la imagen de n8n solo por su Node.js, pg y nodemailer: no descarga nada. El código está en
+  # D:\PROYECTOS\tiktok-live-sales-agent\respaldo. La contraseña de Gmail queda en respaldo_config\.
+  respaldo:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: respaldo-tiktok
+    restart: unless-stopped
+    entrypoint: ["node", "/app/servicio.cjs"]
+    ports:
+      - "127.0.0.1:5690:5690"
+    environment:
+      NODE_PATH: /usr/local/lib/node_modules/n8n/node_modules
+      TZ: ${TZ_OPERACION:-America/La_Paz}
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+      PGDATABASE: ventas
+      PANEL_URL: http://n8n:5678/webhook/panel
+      BACKUP_KEEP: ${BACKUP_KEEP:-30}
+    volumes:
+      - ../tiktok-live-sales-agent/respaldo:/app:ro
+      - ./respaldos_tiktok:/respaldos
+      - ./respaldo_config:/config
+    depends_on:
+      postgres:
+        condition: service_healthy

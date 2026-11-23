@@ -1,0 +1,30 @@
+# Secretos
+.env
+.env.*
+!.env.example
+secrets/
+
+# Datos internos de n8n (clave de cifrado, BD con credenciales, logs)
+n8n_data/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+node_modules/
+
+# Datos de Evolution (sesiones de WhatsApp)
+evolution_instances/
+
+# Datos de PostgreSQL
+postgres_data/
+
+# Imágenes reales de clientes para probar la visión (M3)
+pruebas_vision/
+
+
+# Archivos temporales
+*.log
+.DS_Store
+# Demo armada para Vercel (se genera con node demo/armar.mjs)
+public/
+.vercel/
